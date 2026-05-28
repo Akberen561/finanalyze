@@ -421,6 +421,9 @@ function App() {
     if (activeTab === 'comparison') {
       setVisitedTabs((prev) => (prev.comparison ? prev : { ...prev, comparison: true }))
     }
+    if (activeTab === 'chat') {
+      setVisitedTabs((prev) => (prev.chat ? prev : { ...prev, chat: true }))
+    }
     if (activeTab === 'network') {
       setVisitedTabs((prev) => (prev.network ? prev : { ...prev, network: true }))
     }
@@ -560,10 +563,6 @@ function App() {
 
   const closeImportReview = () => {
     setImportReviewOpen(false)
-  }
-
-  const openImportReview = () => {
-    return
   }
 
   const openCounterpartyGraph = (counterparty) => {
@@ -813,10 +812,11 @@ function App() {
   const tabs = [
     { id: 'transactions', label: 'Транзакции' },
     { id: 'analytics', label: 'Аналитика' },
-    { id: 'comparison', label: 'Справка', disabled: true },
+    { id: 'comparison', label: 'Справка' },
     { id: 'network', label: 'Network' },
-    ...(isAdmin ? [{ id: 'chat', label: 'Ассистент', disabled: true }] : []),
+    ...(isAdmin ? [{ id: 'chat', label: 'Ассистент' }] : []),
   ]
+  const isBlankTab = activeTab === 'comparison' || activeTab === 'chat'
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-[#09090B] text-slate-700 dark:text-zinc-400 font-sans transition-colors">
@@ -1181,22 +1181,21 @@ function App() {
         tabs={tabs} 
         onUpload={handleUploadClick}
         uploadLoading={uploadLoading}
-        riskWarningCount={activeWarnings.length}
-        onOpenRiskReview={openImportReview}
         isAdmin={isAdmin}
         onOpenProjects={() => setProjectManagerOpen(true)}
-        onOpenHistory={() => setHistoryModalOpen(true)}
       />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <Navbar
-          theme={theme}
-          toggleTheme={toggleTheme}
-          onLogout={handleLogout}
-          user={user}
-          filters={filters}
-          setFilters={setFilters}
-        />
+        {!isBlankTab && (
+          <Navbar
+            theme={theme}
+            toggleTheme={toggleTheme}
+            onLogout={handleLogout}
+            user={user}
+            filters={filters}
+            setFilters={setFilters}
+          />
+        )}
 
         <ProjectManagerModal
           open={projectManagerOpen}
@@ -1266,7 +1265,10 @@ function App() {
               </div>
             )}
 
-            {/* Assistant icon is intentionally present in the sidebar only. */}
+            {isAdmin && (visitedTabs.chat || activeTab === 'chat') && (
+              <div className={activeTab === 'chat' ? 'block animate-in fade-in duration-300' : 'hidden'}>
+              </div>
+            )}
           </div>
         </main>
 

@@ -6,10 +6,8 @@ import {
   MessageSquare, 
   Share2,
   FileText,
-  AlertTriangle,
   FolderOpen,
   UploadCloud,
-  History, 
 } from 'lucide-react'
 
 function AdminIcon({ className = 'w-7 h-7' }) {
@@ -38,10 +36,8 @@ function Sidebar({
   tabs,
   onUpload,
   uploadLoading = false,
-  riskWarningCount = 0,
   isAdmin = false,
   onOpenProjects,
-  onOpenHistory,
 }) {
   // Mapping of tab IDs to icons
   const iconMap = {
@@ -110,24 +106,6 @@ function Sidebar({
           </span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => {}}
-          title="Risk Review"
-          disabled
-          className="p-2.5 rounded-xl transition-all duration-200 group relative cursor-not-allowed text-rose-300 opacity-55 dark:text-rose-900"
-        >
-          <AlertTriangle className="w-5 h-5 block" />
-          {riskWarningCount > 0 && (
-            <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-white">
-              {riskWarningCount}
-            </span>
-          )}
-
-          <span className="absolute left-full ml-3 px-2 py-1 bg-slate-900 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-[100] font-bold uppercase tracking-widest">
-            Risk Review
-          </span>
-        </button>
       </nav>
 
       {/* Bottom Nav */}
@@ -158,17 +136,6 @@ function Sidebar({
           </button>
         )}
 
-        <button
-          type="button"
-          onClick={onOpenHistory}
-          title="History & Archive"
-          className="p-2.5 rounded-xl text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-900 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all duration-200 group relative"
-        >
-          <History className="w-5 h-5 block" />
-          <span className="absolute left-full ml-3 px-2 py-1 bg-slate-900 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-[100] font-bold uppercase tracking-widest">
-            History & Archive
-          </span>
-        </button>
       </div>
     </aside>
   )
