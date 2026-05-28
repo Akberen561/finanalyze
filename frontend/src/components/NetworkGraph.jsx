@@ -3,7 +3,6 @@ import cytoscape from 'cytoscape'
 import {
   ChevronLeft,
   ChevronRight,
-  FileSpreadsheet,
   Loader2,
   LocateFixed,
   Maximize2,
@@ -20,7 +19,6 @@ import {
   fetchCounterpartySearch,
   fetchTopCounterparties,
 } from '../services/api'
-import { autoFitWorksheetColumns } from '../utils/xlsx'
 
 function formatCompactAmount(value = 0) {
   const num = Number(value || 0)
@@ -103,21 +101,6 @@ function incomeOf(row) {
 function expenseOf(row) {
   const debit = Number(row?.debit || 0)
   return debit > 0 ? debit : 0
-}
-
-function buildTransactionExportRows(rows) {
-  return (rows || []).map((row) => ({
-    'Дата': row.date || '',
-    'Отправитель': row.sender_name || '',
-    'Счет отправителя': row.sender_account || row.sender?.account || '',
-    'ИИН/БИН отправителя': row.sender_iin_bin || row.sender?.iin_bin || '',
-    'Получатель': row.recipient_name || '',
-    'Счет получателя': row.recipient_account || row.recipient?.account || '',
-    'ИИН/БИН получателя': row.recipient_iin_bin || row.recipient?.iin_bin || '',
-    'Назначение': row.purpose || '',
-    'Валюта': row.currency || 'KZT',
-    'Сумма': Number(row.amount_tenge || row.debit || row.credit || 0),
-  }))
 }
 
 function average(values) {
@@ -600,19 +583,6 @@ function NetworkGraph({ theme = 'light', externalFocus = null }) {
       }))
     }
   }, [])
-
-  const exportEdgeModalExcel = useCallback(async () => {
-    const rows = edgeModal.rows || []
-    if (!rows.length) return
-
-    const XLSX = await import('xlsx')
-    const workbook = XLSX.utils.book_new()
-    const exportRows = buildTransactionExportRows(rows)
-    const worksheet = XLSX.utils.json_to_sheet(exportRows)
-    autoFitWorksheetColumns(worksheet, exportRows)
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Transactions')
-    XLSX.writeFile(workbook, `${safeDocFileName(`${edgeModal.title || 'graph'}-transactions`)}.xlsx`)
-  }, [edgeModal.rows, edgeModal.title])
 
   const downloadNodeReport = useCallback(async (node) => {
     if (!node?.iinBin || reportLoading) return
@@ -1598,20 +1568,6 @@ function NetworkGraph({ theme = 'light', externalFocus = null }) {
                   <p className={`mt-1 text-sm ${mutedText}`}>{edgeModal.title} · Найдено: {edgeModal.total}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {edgeModal.rows.length > 0 && !edgeModal.loading && !edgeModal.error && (
-                    <button
-                      type="button"
-                      onClick={exportEdgeModalExcel}
-                      className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-bold transition-all ${
-                        isDark
-                          ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-100 hover:border-emerald-300/40 hover:bg-emerald-400/15'
-                          : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100'
-                      }`}
-                    >
-                      <FileSpreadsheet className="h-4 w-4" />
-                      Excel
-                    </button>
-                  )}
                   <button
                     type="button"
                     onClick={closeEdgeModal}

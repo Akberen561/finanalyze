@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { Archive, Network, ShieldCheck, Activity, Users, List, ChevronUp, ChevronDown, FileDown } from 'lucide-react'
+import { Archive, Network, ShieldCheck, Activity, Users, List, ChevronUp, ChevronDown } from 'lucide-react'
 import './App.css'
 import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
@@ -10,6 +10,7 @@ import Login from './components/Login'
 import ProjectManagerModal from './components/ProjectManagerModal'
 import HistoryModal from './components/HistoryModal'
 import UploadTracker from './components/UploadTracker'
+import Chat from './components/Chat'
 import {
   AUTH_EXPIRED_EVENT,
   activateProject,
@@ -22,8 +23,6 @@ import {
   importStatement,
   createProject as apiCreateProject,
   deleteProject as apiDeleteProject,
-  exportEsfExcel,
-  exportTransactionsExcel,
 } from './services/api'
 
 const IMPORT_REVIEWS_STORAGE_KEY = 'finanalytica:import-reviews'
@@ -90,7 +89,7 @@ function isCompleteFilterDate(value) {
 function mapEsfRecordToTableRow(record, viewDirection = 'sale') {
   const amount = Number(record?.total_amount || 0)
   const isPurchase = viewDirection === 'purchase'
-  const category = isPurchase ? 'Приобретение' : 'Реализация'
+  const category = 'ЭСФ'
   const purpose = [record?.tru_name, record?.registration_number, record?.contract_number]
     .map((value) => String(value || '').trim())
     .filter(Boolean)
@@ -206,7 +205,6 @@ function App() {
   const [summary, setSummary] = useState({ total_debit: 0, total_credit: 0 })
   const [txLoading, setTxLoading] = useState(false)
   const [uploadLoading, setUploadLoading] = useState(false)
-  const [exportLoading, setExportLoading] = useState(false)
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' })
   const activeProjectId = user?.active_project_id || null
   const projectImportReview = activeProjectId ? importReviewsByProject[activeProjectId] || { warnings: [] } : { warnings: [] }
@@ -512,39 +510,6 @@ function App() {
 
   const isAdmin = (user?.role || getRoleFromToken()) === 'admin'
 
-  const handleExportTransactions = async () => {
-    try {
-      setExportLoading(true)
-      const normalizedDate = String(filters?.date || '').trim()
-      const apiDate = isCompleteFilterDate(normalizedDate) ? normalizedDate : ''
-      const exportFilters = { ...filters, date: apiDate }
-      const blob = recordsMode === 'esf'
-        ? await exportEsfExcel(exportFilters)
-        : await exportTransactionsExcel({
-            ...exportFilters,
-            scope: recordsMode === 'all' ? 'all' : 'bank',
-          })
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
-      a.href = url
-      const exportPrefix = recordsMode === 'esf'
-        ? 'esf'
-        : recordsMode === 'all'
-          ? 'transactions_combined'
-          : 'transactions_bank'
-      a.download = `${exportPrefix}_${ts}.xlsx`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      window.URL.revokeObjectURL(url)
-    } catch (err) {
-      window.alert(`Ошибка экспорта: ${err.message}`)
-    } finally {
-      setExportLoading(false)
-    }
-  }
-
   const handleSortChange = (key, direction) => {
     setSortConfig({ key, direction })
   }
@@ -816,7 +781,7 @@ function App() {
     { id: 'network', label: 'Network' },
     ...(isAdmin ? [{ id: 'chat', label: 'Ассистент' }] : []),
   ]
-  const isBlankTab = activeTab === 'comparison' || activeTab === 'chat'
+  const isBlankTab = activeTab === 'comparison'
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-[#09090B] text-slate-700 dark:text-zinc-400 font-sans transition-colors">
@@ -1021,16 +986,6 @@ function App() {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => {}}
-                          disabled
-                          className="flex cursor-not-allowed items-center gap-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-indigo-600 opacity-50 dark:text-indigo-300"
-                          title="Word export disabled"
-                        >
-                          <FileDown className="h-4 w-4" />
-                          Word
-                        </button>
-                        <button
-                          type="button"
                           onClick={() => handleApproveWarning(warning.uid || warning.code)}
                           className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-emerald-600 transition-all hover:bg-emerald-500/10 dark:text-emerald-400"
                           title="Снять подозрения"
@@ -1232,8 +1187,6 @@ function App() {
                 esfYears={esfYears}
                 recordsMode={recordsMode}
                 loading={txLoading}
-                exportLoading={exportLoading}
-                onExport={handleExportTransactions}
                 onEsfDirectionChange={setEsfDirection}
                 onEsfSheetChange={setEsfSheet}
                 onRecordsModeChange={setRecordsMode}
@@ -1267,6 +1220,7 @@ function App() {
 
             {isAdmin && (visitedTabs.chat || activeTab === 'chat') && (
               <div className={activeTab === 'chat' ? 'block animate-in fade-in duration-300' : 'hidden'}>
+                <Chat key={activeProjectId || 'default-project'} />
               </div>
             )}
           </div>

@@ -5,22 +5,13 @@ import {
 } from 'recharts'
 import {
   fetchTimeSeries,
-  fetchTimeSeriesTransactions,
   fetchSummary,
-  fetchTopExpenses,
-  fetchTopExpenseTransactions,
   fetchTopCounterparties,
   fetchCashTop,
-  fetchCashTransactions,
-  fetchCounterpartyTransactions,
-  fetchCounterpartyGraph,
   fetchCategorySummary,
-  fetchTransactions,
 } from '../services/api'
-import { autoFitWorksheetColumns } from '../utils/xlsx'
-
 import {
-  Filter, Database, ArrowDownRight, ArrowUpRight, Activity, Sparkles, ListTodo, ArrowRight, FileSpreadsheet, FileText, Printer
+  Filter, Database, ArrowDownRight, ArrowUpRight, Activity, Sparkles, ListTodo, ArrowRight
 } from 'lucide-react'
 
 const DONUT_COLORS = ['#6366f1', '#4f46e5', '#4338ca', '#3730a3', '#312e81', '#1e1b4b', '#1e1b4b', '#4f46e5', '#6366f1', '#818cf8']
@@ -90,102 +81,6 @@ function mergeAgentRows(rows, valueKey) {
   return [...merged.values()].sort((a, b) => Number(b[valueKey] || 0) - Number(a[valueKey] || 0))
 }
 
-const CATEGORY_EXPORT_COLUMNS = [
-  { header: 'Дата', value: (tx) => tx.date || '' },
-  { header: 'Отправитель', value: (tx) => tx.sender?.name || '' },
-  { header: 'Счет отправителя', value: (tx) => tx.sender?.account || '' },
-  { header: 'ИИН/БИН отправителя', value: (tx) => tx.sender?.iin_bin || '' },
-  { header: 'Получатель', value: (tx) => tx.recipient?.name || '' },
-  { header: 'Счет получателя', value: (tx) => tx.recipient?.account || '' },
-  { header: 'ИИН/БИН получателя', value: (tx) => tx.recipient?.iin_bin || '' },
-  { header: 'Назначение', value: (tx) => tx.purpose || '' },
-  { header: 'Валюта', value: (tx) => tx.currency || 'KZT' },
-  { header: 'Сумма', value: (tx) => Number(tx.amount_tenge || 0) },
-]
-
-function escapeExportHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
-function safeExportFileName(value) {
-  return String(value || 'category-transactions')
-    .replace(/[\\/:*?"<>|]+/g, '-')
-    .replace(/\s+/g, '-')
-    .slice(0, 90)
-}
-
-function downloadExportBlob(content, fileName, type) {
-  const blob = content instanceof Blob ? content : new Blob([content], { type })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = fileName
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
-}
-
-function buildCategoryExportRows(rows) {
-  return rows.map((tx) => CATEGORY_EXPORT_COLUMNS.reduce((acc, col) => {
-    acc[col.header] = col.value(tx)
-    return acc
-  }, {}))
-}
-
-function buildTransactionExportRows(rows) {
-  return rows.map((tx) => ({
-    'Дата': tx.date || '',
-    'Отправитель': tx.sender_name || tx.sender?.name || '',
-    'Счет отправителя': tx.sender_account || tx.sender?.account || '',
-    'ИИН/БИН отправителя': tx.sender_iin_bin || tx.sender?.iin_bin || '',
-    'Получатель': tx.recipient_name || tx.recipient?.name || '',
-    'Счет получателя': tx.recipient_account || tx.recipient?.account || '',
-    'ИИН/БИН получателя': tx.recipient_iin_bin || tx.recipient?.iin_bin || '',
-    'Назначение': tx.purpose || '',
-    'Валюта': tx.currency || 'KZT',
-    'Сумма': Number(tx.amount_tenge || 0),
-  }))
-}
-
-function buildCategoryExportHtml(title, rows) {
-  const totalAmount = rows.reduce((sum, tx) => sum + Number(tx.amount_tenge || 0), 0)
-  const bodyRows = rows.map((tx) => (
-    `<tr>${CATEGORY_EXPORT_COLUMNS.map((col) => `<td>${escapeExportHtml(col.value(tx))}</td>`).join('')}</tr>`
-  )).join('')
-
-  return `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>${escapeExportHtml(title)}</title>
-  <style>
-    body { font-family: Arial, sans-serif; color: #111827; }
-    h1 { font-size: 20px; margin: 0 0 8px; }
-    .meta { color: #4b5563; font-size: 12px; margin-bottom: 14px; }
-    table { width: 100%; border-collapse: collapse; font-size: 10px; }
-    th, td { border: 1px solid #d1d5db; padding: 6px; vertical-align: top; }
-    th { background: #f3f4f6; text-align: left; }
-  </style>
-</head>
-<body>
-  <h1>${escapeExportHtml(title || 'Транзакции категории')}</h1>
-  <div class="meta">
-    <div>Строк: ${rows.length}</div>
-    <div>Общая сумма: ${escapeExportHtml(fmtFull(totalAmount))} ${TENGE}</div>
-    <div>Дата выгрузки: ${escapeExportHtml(new Date().toLocaleString('ru-RU'))}</div>
-  </div>
-  <table>
-    <thead><tr>${CATEGORY_EXPORT_COLUMNS.map((col) => `<th>${escapeExportHtml(col.header)}</th>`).join('')}</tr></thead>
-    <tbody>${bodyRows || `<tr><td colspan="${CATEGORY_EXPORT_COLUMNS.length}">Нет данных</td></tr>`}</tbody>
-  </table>
-</body>
-</html>`
-}
 
 function buildGraphLayout(nodes, width = 900, height = 520) {
   const centerX = width / 2
@@ -353,15 +248,14 @@ function DonutWithList({
 function AnalyticsDashboard({ theme, filters = {} }) {
   const isDark = theme === 'dark'
   const activeFilters = filters || {}
-  const [timePeriod, setTimePeriod] = useState('Месяц')
-  const [bottomToggle, setBottomToggle] = useState('Расходы')
-  const [chartZoom, setChartZoom] = useState(1)
-  const [categoryZoom, setCategoryZoom] = useState(1)
+  const [timePeriod] = useState('Месяц')
+  const [bottomToggle] = useState('Расходы')
+  const [chartZoom] = useState(1)
+  const [categoryZoom] = useState(1)
   const [kpiValueFontSize, setKpiValueFontSize] = useState(24)
 
   const [chartData, setChartData] = useState([])
   const [kpi, setKpi] = useState({ total_credit: 0, total_debit: 0, total_turnover: 0, total_transactions: 0, period: { from: '—', to: '—' } })
-  const [expenseData, setExpenseData] = useState({ data: [], total: 0 })
   const [counterparties, setCounterparties] = useState([])
   const [cashWithdrawals, setCashWithdrawals] = useState({ data: [], total: 0 })
   const [cashDeposits, setCashDeposits] = useState({ data: [], total: 0 })
@@ -400,7 +294,7 @@ function AnalyticsDashboard({ theme, filters = {} }) {
   })
   const [investigationZoom, setInvestigationZoom] = useState(1)
   const [AnalyticsBootstrapped, setAnalyticsBootstrapped] = useState(false)
-  const [cashToggle, setCashToggle] = useState('withdrawal')
+  const [cashToggle] = useState('withdrawal')
   const pinchStartDistanceRef = useRef(null)
   const pinchStartZoomRef = useRef(1)
   const investigationViewportRef = useRef(null)
@@ -466,12 +360,7 @@ function AnalyticsDashboard({ theme, filters = {} }) {
     catch (e) { console.error(e) }
   }, [activeFilters])
 
-  const loadExpenses = useCallback(async (type) => {
-    try {
-      const apiType = type === 'Расходы' ? 'debit' : 'credit'
-      setExpenseData(await fetchTopExpenses(apiType, 10, activeFilters))
-    } catch (e) { console.error(e) }
-  }, [activeFilters])
+  const loadExpenses = useCallback(async () => {}, [])
 
   const loadCounterparties = useCallback(async () => {
     try {
@@ -496,198 +385,15 @@ function AnalyticsDashboard({ theme, filters = {} }) {
     } catch (e) { console.error(e) }
   }, [activeFilters])
 
-  const openCashTransactions = useCallback(async (type, item) => {
-    if (!item?.iinBin) return
+  const openCashTransactions = useCallback(() => {}, [])
 
-    setCashModal({
-      open: true,
-      title: type === 'withdrawal' ? 'Снятие наличных' : 'Пополнение наличными',
-      loading: true,
-      rows: [],
-      total: 0,
-      error: '',
-    })
+  const openCounterpartyTransactions = useCallback(() => {}, [])
 
-    try {
-      const res = await fetchCashTransactions(type, item.iinBin, item.account, 200, activeFilters)
-      setCashModal((prev) => ({
-        ...prev,
-        loading: false,
-        rows: res.data || [],
-        total: res.total || 0,
-        error: '',
-      }))
-    } catch (e) {
-      setCashModal((prev) => ({
-        ...prev,
-        loading: false,
-        error: e?.message || 'Не удалось загрузить транзакции',
-      }))
-    }
-  }, [activeFilters])
+  const openCategoryTransactions = useCallback(() => {}, [])
 
-  const openCounterpartyTransactions = useCallback(async (item) => {
-    if (!item?.iinBin) return
+  const openTimePointTransactions = useCallback(() => {}, [])
 
-    setCashModal({
-      open: true,
-      title: 'Топ контрагентов',
-      loading: true,
-      rows: [],
-      total: 0,
-      error: '',
-    })
-
-    try {
-      const res = await fetchCounterpartyTransactions(item.iinBin, item.account, 200, activeFilters)
-      setCashModal((prev) => ({
-        ...prev,
-        loading: false,
-        rows: res.data || [],
-        total: res.total || 0,
-        error: '',
-      }))
-    } catch (e) {
-      setCashModal((prev) => ({
-        ...prev,
-        loading: false,
-        error: e?.message || 'Не удалось загрузить транзакции',
-      }))
-    }
-  }, [activeFilters])
-
-  const openTopExpenseTransactions = useCallback(async (item) => {
-    if (!item) return
-
-    setCashModal({
-      open: true,
-      title: bottomToggle === 'Расходы' ? 'Топ по расходу' : 'Топ по поступлению',
-      loading: true,
-      rows: [],
-      total: 0,
-      error: '',
-    })
-
-    try {
-      const apiType = bottomToggle === 'Расходы' ? 'debit' : 'credit'
-      const res = await fetchTopExpenseTransactions(
-        apiType,
-        item.iinBin || '',
-        item.account || '',
-        item.name || '',
-        200,
-        activeFilters,
-      )
-      setCashModal((prev) => ({
-        ...prev,
-        loading: false,
-        rows: res.data || [],
-        total: res.total || 0,
-        error: '',
-      }))
-    } catch (e) {
-      setCashModal((prev) => ({
-        ...prev,
-        loading: false,
-        error: e?.message || 'Не удалось загрузить транзакции',
-      }))
-    }
-  }, [activeFilters, bottomToggle])
-
-  const openCategoryTransactions = useCallback(async (categoryName) => {
-    if (!categoryName) return
-    setCategoryModal({
-      open: true,
-      loading: true,
-      title: `Категория: ${categoryName}`,
-      rows: [],
-      total: 0,
-      error: '',
-    })
-    try {
-      const res = await fetchTransactions({
-        ...activeFilters,
-        category: categoryName,
-        page: 1,
-        perPage: 500,
-      })
-      setCategoryModal((prev) => ({
-        ...prev,
-        loading: false,
-        rows: res?.data || [],
-        total: res?.pagination?.total || 0,
-        error: '',
-      }))
-    } catch (e) {
-      setCategoryModal((prev) => ({
-        ...prev,
-        loading: false,
-        error: e?.message || 'Не удалось загрузить транзакции категории',
-      }))
-    }
-  }, [activeFilters])
-
-  const openTimePointTransactions = useCallback(async (point) => {
-    if (!point?.date) return
-    const periodApi = PERIOD_MAP[timePeriod] || 'month'
-    const title = `Период: ${point.label || point.date}`
-
-    setCashModal({
-      open: true,
-      title,
-      loading: true,
-      rows: [],
-      total: 0,
-      error: '',
-    })
-
-    try {
-      const res = await fetchTimeSeriesTransactions(periodApi, point.date, 200, activeFilters)
-      setCashModal((prev) => ({
-        ...prev,
-        loading: false,
-        rows: res.data || [],
-        total: res.total || 0,
-        error: '',
-      }))
-    } catch (e) {
-      setCashModal((prev) => ({
-        ...prev,
-        loading: false,
-        error: e?.message || 'Не удалось загрузить транзакции периода',
-      }))
-    }
-  }, [activeFilters, timePeriod])
-
-  const openInvestigationGraph = useCallback(async (item) => {
-    if (!item?.iinBin) return
-    setInvestigationModal({
-      open: true,
-      loading: true,
-      error: '',
-      centerName: item.name || 'Контрагент',
-      nodes: [],
-      edges: [],
-    })
-    setInvestigationZoom(1)
-
-    try {
-      const res = await fetchCounterpartyGraph(item.iinBin, 2, 6)
-      setInvestigationModal((prev) => ({
-        ...prev,
-        loading: false,
-        error: '',
-        nodes: res.nodes || [],
-        edges: res.edges || [],
-      }))
-    } catch (e) {
-      setInvestigationModal((prev) => ({
-        ...prev,
-        loading: false,
-        error: e?.message || 'Не удалось загрузить граф связей',
-      }))
-    }
-  }, [])
+  const openInvestigationGraph = useCallback(() => {}, [])
 
   const closeCashModal = () => {
     setCashModal((prev) => ({ ...prev, open: false }))
@@ -824,12 +530,7 @@ function AnalyticsDashboard({ theme, filters = {} }) {
           : 'text-slate-500 hover:text-cyan-900 hover:bg-cyan-50'
     }`
 
-  const expenseList = (expenseData.data || []).map((d) => ({
-    name: compactLabel(d.counterparty?.name || '—'),
-    iinBin: d.counterparty?.iin_bin || '',
-    account: d.counterparty?.account || '',
-    amount: d.amount,
-  }))
+  const visibleExpenseList = []
 
   const cpList = mergeAgentRows(counterparties.map((d) => ({
     name: d.counterparty?.name || '—',
@@ -866,7 +567,7 @@ function AnalyticsDashboard({ theme, filters = {} }) {
     color: CASH_DEPOSIT_COLORS[i % CASH_DEPOSIT_COLORS.length],
   }))
 
-  const rawCategoryBars = (categorySummary || []).slice(0, 16).map((item) => ({
+  const rawCategoryBars = (categorySummary || []).slice(0, 4).map((item) => ({
     name: item.category,
     txCount: item.transaction_count || 0,
     turnover: item.total_turnover || 0,
@@ -900,8 +601,8 @@ function AnalyticsDashboard({ theme, filters = {} }) {
   const categoryMaxValue = categoryBars.reduce((acc, item) => Math.max(acc, Number(item?.turnover || 0)), 0)
   const zoomedCategoryMax = categoryMaxValue > 0 ? Math.max(1, categoryMaxValue / categoryZoom) : 1
   const categoryRows = []
-  for (let i = 0; i < categoryBars.length; i += 7) {
-    categoryRows.push(categoryBars.slice(i, i + 7))
+  for (let i = 0; i < categoryBars.length; i += 4) {
+    categoryRows.push(categoryBars.slice(i, i + 4))
   }
   const renderCategoryTick = ({ x, y, payload }) => {
     const lines = splitLabelLines(payload?.value || '', 14)
@@ -937,40 +638,6 @@ function AnalyticsDashboard({ theme, filters = {} }) {
     }
     return (Number(a?.amount_tenge || 0) - Number(b?.amount_tenge || 0)) * dir
   })
-  const exportCategoryModal = async (format) => {
-    const rows = sortedCategoryModalRows
-    const title = categoryModal.title || 'Транзакции категории'
-    const fileBase = safeExportFileName(title)
-
-    if (format === 'excel') {
-      const XLSX = await import('xlsx')
-      const exportRows = buildCategoryExportRows(rows)
-      const worksheet = XLSX.utils.json_to_sheet(exportRows)
-      autoFitWorksheetColumns(worksheet, exportRows)
-      const workbook = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Transactions')
-      XLSX.writeFile(workbook, `${fileBase}.xlsx`)
-      return
-    }
-
-    const html = buildCategoryExportHtml(title, rows)
-    if (format === 'word') {
-      void html
-      void fileBase
-      return
-    }
-
-    const printWindow = window.open('', '_blank')
-    if (!printWindow) {
-      downloadExportBlob(`\ufeff${html}`, `${fileBase}.html`, 'text/html;charset=utf-8')
-      return
-    }
-    printWindow.document.open()
-    printWindow.document.write(html)
-    printWindow.document.close()
-    printWindow.focus()
-    printWindow.print()
-  }
   const sortedCashModalRows = [...(cashModal.rows || [])].sort((a, b) => {
     const dir = cashTxSort.direction === 'asc' ? 1 : -1
     if (cashTxSort.field === 'date') {
@@ -984,15 +651,6 @@ function AnalyticsDashboard({ theme, filters = {} }) {
     }
     return (Number(a?.amount_tenge || 0) - Number(b?.amount_tenge || 0)) * dir
   })
-  const exportCashModalExcel = async () => {
-    const XLSX = await import('xlsx')
-    const exportRows = buildTransactionExportRows(sortedCashModalRows)
-    const worksheet = XLSX.utils.json_to_sheet(exportRows)
-    autoFitWorksheetColumns(worksheet, exportRows)
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Transactions')
-    XLSX.writeFile(workbook, `${safeExportFileName(`${cashModal.title || 'transactions'}-transactions`)}.xlsx`)
-  }
   const renderTimeDot = useCallback((color) => (props) => {
     const { cx, cy, payload } = props || {}
     if (typeof cx !== 'number' || typeof cy !== 'number') return null
@@ -1018,14 +676,6 @@ function AnalyticsDashboard({ theme, filters = {} }) {
       </g>
     )
   }, [isDark, openTimePointTransactions])
-  const handleTimeChartClick = useCallback((state) => {
-    const payload =
-      state?.activePayload?.[0]?.payload
-      || state?.payload
-      || (state?.activeLabel ? chartData.find((p) => p.label === state.activeLabel || p.date === state.activeLabel) : null)
-    if (!payload?.date) return
-    openTimePointTransactions(payload)
-  }, [openTimePointTransactions, chartData])
   const RenderActiveExpenseBar = useCallback((props) => (
     <Rectangle
       {...props}
@@ -1056,7 +706,7 @@ function AnalyticsDashboard({ theme, filters = {} }) {
           </div>
           <div className="flex min-w-0 max-w-full items-baseline gap-1.5 overflow-hidden text-emerald-600 dark:text-emerald-400">
             <span className="min-w-0 whitespace-nowrap font-black leading-none tabular-nums" style={{ fontSize: kpiValueFontSize }}>
-              {fmtFull(kpi.total_credit)}
+              —
             </span>
             <span className="shrink-0 text-sm font-bold opacity-60 uppercase leading-none">{TENGE}</span>
           </div>
@@ -1071,7 +721,7 @@ function AnalyticsDashboard({ theme, filters = {} }) {
           </div>
           <div className="flex min-w-0 max-w-full items-baseline gap-1.5 overflow-hidden">
             <span className="min-w-0 whitespace-nowrap font-black text-slate-900 dark:text-zinc-100 leading-none tabular-nums" style={{ fontSize: kpiValueFontSize }}>
-              {kpi.total_transactions.toLocaleString()}
+              —
             </span>
             <span className="shrink-0 text-sm font-bold text-slate-400 uppercase leading-none">ЕД.</span>
           </div>
@@ -1085,7 +735,7 @@ function AnalyticsDashboard({ theme, filters = {} }) {
             </div>
           </div>
           <div className="flex min-w-0 max-w-full items-baseline gap-1.5 overflow-hidden text-rose-500">
-            <span className="min-w-0 whitespace-nowrap font-black leading-none tabular-nums" style={{ fontSize: kpiValueFontSize }}>−{fmtFull(kpi.total_debit)}</span>
+            <span className="min-w-0 whitespace-nowrap font-black leading-none tabular-nums" style={{ fontSize: kpiValueFontSize }}>—</span>
             <span className="shrink-0 text-sm font-bold opacity-60 uppercase leading-none">{TENGE}</span>
           </div>
         </div>
@@ -1099,7 +749,7 @@ function AnalyticsDashboard({ theme, filters = {} }) {
           </div>
           <div className="flex min-w-0 max-w-full items-baseline gap-1.5 overflow-hidden text-slate-900 dark:text-zinc-100">
             <span className="min-w-0 whitespace-nowrap font-black leading-none tabular-nums" style={{ fontSize: kpiValueFontSize }}>
-              {fmtFull(kpi.total_turnover)}
+              —
             </span>
             <span className="shrink-0 text-sm font-bold text-slate-400 uppercase leading-none">{TENGE}</span>
           </div>
@@ -1118,13 +768,13 @@ function AnalyticsDashboard({ theme, filters = {} }) {
             <div className="flex items-center gap-2">
               <div className={`flex items-center gap-1 p-1 rounded-lg ${controlShellClass}`}>
                 {['Год', 'Месяц', 'День'].map((period) => (
-                  <button key={period} onClick={() => setTimePeriod(period)} className={toggleBtnClass(timePeriod === period)}>
+                  <button key={period} onClick={() => {}} className={toggleBtnClass(timePeriod === period)}>
                     {period}
                   </button>
                 ))}
               </div>
               <button
-                onClick={() => setChartZoom(1)}
+                onClick={() => {}}
                 className="p-1 px-3 bg-slate-50 dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg text-slate-400 transition-all text-[9px] font-black uppercase"
               >
                 Reset
@@ -1137,7 +787,7 @@ function AnalyticsDashboard({ theme, filters = {} }) {
               <AreaChart
                 data={chartData}
                 margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
-                onClick={handleTimeChartClick}
+                onClick={() => {}}
                 style={{ cursor: 'pointer' }}
               >
                 <defs>
@@ -1193,7 +843,7 @@ function AnalyticsDashboard({ theme, filters = {} }) {
                  max="100"
                  step="1"
                  value={chartZoom}
-                 onChange={(e) => setChartZoom(Number(e.target.value))}
+                 onChange={() => {}}
                  className="w-24 h-1 bg-slate-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                />
             </div>
@@ -1212,7 +862,7 @@ function AnalyticsDashboard({ theme, filters = {} }) {
           <div className="flex-1 min-h-0 flex flex-col">
             <div className="h-[220px] shrink-0">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={expenseList.slice(0, 8)} layout="vertical" margin={{ top: 0, right: 8, left: -22, bottom: 0 }}>
+                <BarChart data={visibleExpenseList} layout="vertical" margin={{ top: 0, right: 8, left: -22, bottom: 0 }}>
                 <XAxis type="number" hide />
                 <YAxis
                   type="category"
@@ -1231,10 +881,10 @@ function AnalyticsDashboard({ theme, filters = {} }) {
                   dataKey="amount" 
                   radius={[0, 6, 6, 0]} 
                   barSize={22} 
-                  onClick={(data) => openTopExpenseTransactions(data?.payload)} 
+                  onClick={() => {}} 
                   style={{ cursor: 'pointer' }}
                 >
-                  {expenseList.slice(0, 8).map((entry, i) => (
+                  {visibleExpenseList.map((entry, i) => (
                     <Cell 
                       key={i} 
                       fill={bottomToggle === 'Расходы' ? '#ef4444' : '#10b981'} 
@@ -1247,7 +897,7 @@ function AnalyticsDashboard({ theme, filters = {} }) {
             </div>
             
             <div className="mt-6 space-y-2.5">
-              {expenseList.slice(0, 5).map((item, i) => (
+              {visibleExpenseList.map((item, i) => (
                 <div key={i} className="flex items-center justify-between gap-3 border-b border-slate-200/80 pb-2 last:border-b-0 last:pb-0 dark:border-zinc-800/80">
                   <span className={`truncate text-[11px] font-bold ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                     {item.name}
@@ -1263,14 +913,14 @@ function AnalyticsDashboard({ theme, filters = {} }) {
           <div className="mt-auto rounded-[26px] border border-slate-200 bg-slate-50/90 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
             <div className={`mb-4 flex items-center gap-1 rounded-2xl p-1 ${controlShellClass}`}>
               {['Расходы', 'Поступления'].map((opt) => (
-                <button key={opt} onClick={() => setBottomToggle(opt)} className={`flex-1 ${toggleBtnClass(bottomToggle === opt)}`}>
+                <button key={opt} onClick={() => {}} className={`flex-1 ${toggleBtnClass(bottomToggle === opt)}`}>
                   {opt}
                 </button>
               ))}
             </div>
             <div className="mt-4 border-t border-slate-200 pt-4 dark:border-zinc-800">
                <p className={subtitleText}>ИТОГО {bottomToggle.toUpperCase()}</p>
-               <p className="mt-1 text-[28px] font-black leading-none tracking-tight text-slate-900 dark:text-zinc-100">{fmtFull(expenseData.total)} <span className="text-base text-slate-400 dark:text-zinc-500">{TENGE}</span></p>
+               <p className="mt-1 text-[28px] font-black leading-none tracking-tight text-slate-900 dark:text-zinc-100">— <span className="text-base text-slate-400 dark:text-zinc-500">{TENGE}</span></p>
             </div>
           </div>
         </div>
@@ -1291,7 +941,7 @@ function AnalyticsDashboard({ theme, filters = {} }) {
               max="100"
               step="1"
               value={categoryZoom}
-              onChange={(e) => setCategoryZoom(Number(e.target.value))}
+              onChange={() => {}}
               className="w-20 h-1 accent-indigo-500"
             />
           </div>
@@ -1346,7 +996,7 @@ function AnalyticsDashboard({ theme, filters = {} }) {
                           key={cat.name}
                           fill={cat.color}
                           cursor="pointer"
-                          onClick={() => openCategoryTransactions(cat.name)}
+                          onClick={() => {}}
                         />
                       ))}
                     </Bar>
@@ -1431,7 +1081,7 @@ function AnalyticsDashboard({ theme, filters = {} }) {
             mutedText={mutedText}
             tooltipStyle={tooltipStyle}
             onTxClick={(item) => openCashTransactions(cashToggle, item)}
-            onToggle={() => setCashToggle(cashToggle === 'withdrawal' ? 'deposit' : 'withdrawal')}
+            onToggle={() => {}}
           />
         </div>
       </section>
@@ -1586,19 +1236,6 @@ function AnalyticsDashboard({ theme, filters = {} }) {
               <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={exportCashModalExcel}
-                disabled={cashModal.loading || cashModal.rows.length === 0}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-black uppercase tracking-widest transition-all disabled:opacity-40 ${
-                  isDark
-                    ? 'border border-emerald-300/25 bg-emerald-300/10 text-emerald-100 hover:bg-emerald-300/16 hover:border-emerald-300/40'
-                    : 'border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                }`}
-              >
-                <FileSpreadsheet className="h-3.5 w-3.5" />
-                Excel
-              </button>
-              <button
-                type="button"
                 onClick={closeCashModal}
                 className={`px-3 py-1.5 rounded-md text-xs ${actionButtonClass}`}
               >
@@ -1670,33 +1307,6 @@ function AnalyticsDashboard({ theme, filters = {} }) {
                 <p className={`text-xs ${subtitleText}`}>Найдено: {categoryModal.total}</p>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => exportCategoryModal('excel')}
-                  disabled={categoryModal.loading || categoryModal.rows.length === 0}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs disabled:opacity-40 ${actionButtonClass}`}
-                >
-                  <FileSpreadsheet className="h-3.5 w-3.5" />
-                  Excel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => exportCategoryModal('pdf')}
-                  disabled={categoryModal.loading || categoryModal.rows.length === 0}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs disabled:opacity-40 ${actionButtonClass}`}
-                >
-                  <Printer className="h-3.5 w-3.5" />
-                  PDF
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {}}
-                  disabled
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs disabled:opacity-40 ${actionButtonClass}`}
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  Word
-                </button>
                 <button
                   type="button"
                   onClick={closeCategoryModal}

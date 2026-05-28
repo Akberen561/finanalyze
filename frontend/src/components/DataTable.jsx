@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useMemo } from 'react'
 import {
   Database,
   ArrowUpDown,
-  Download,
   ChevronLeft,
   ChevronRight,
   ArrowUpRight,
@@ -96,111 +95,6 @@ function ModeSwitch({ recordsMode, onRecordsModeChange }) {
   )
 }
 
-function EsfSwitches({ esfDirection, esfSheet, onEsfDirectionChange, onEsfSheetChange }) {
-  const directionLabel = esfDirection === 'purchase' ? 'Приобретение' : 'Реализация'
-  const sheets = esfDirection === 'purchase'
-    ? [
-        { key: 'esf', label: 'ЭСФ' },
-        { key: 'summary', label: 'Свод 8' },
-        { key: 'tru', label: 'Свод ТРУ' },
-      ]
-    : [
-        { key: 'esf', label: 'ЭСФ' },
-        { key: 'summary', label: 'Свод 7' },
-        { key: 'tru', label: 'Свод ТРУ' },
-      ]
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        {[
-          { key: 'sale', label: 'Реализация' },
-          { key: 'purchase', label: 'Приобретение' },
-        ].map((mode) => {
-          const active = esfDirection === mode.key
-          return (
-            <button
-              key={mode.key}
-              type="button"
-              onClick={() => onEsfDirectionChange?.(mode.key)}
-              className={`rounded-xl px-3 py-2 text-[9px] font-black uppercase tracking-[0.18em] transition-all ${
-                active
-                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
-                  : 'border border-slate-200 bg-slate-50 text-slate-500 hover:text-emerald-500 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-500'
-              }`}
-            >
-              {mode.label}
-            </button>
-          )
-        })}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 dark:text-zinc-500">
-          {directionLabel}
-        </span>
-        {sheets.map((sheet) => {
-          const active = esfSheet === sheet.key
-          return (
-            <button
-              key={sheet.key}
-              type="button"
-              onClick={() => onEsfSheetChange?.(sheet.key)}
-              className={`rounded-xl px-3 py-2 text-[9px] font-black uppercase tracking-[0.18em] transition-all ${
-                active
-                  ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
-                  : 'border border-slate-200 bg-slate-50 text-slate-500 hover:text-indigo-500 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-500'
-              }`}
-            >
-              {sheet.label}
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-function buildEsfSummaryColumns(esfYears = []) {
-  return [
-    { key: 'buyer_iin_bin', label: 'ИИН/БИН ПОКУП.', width: 'min-w-[150px]' },
-    { key: 'buyer_name', label: 'ПОКУПАТЕЛЬ', width: 'min-w-[220px]' },
-    { key: 'supplier_iin_bin', label: 'ИИН/БИН ПОСТ.', width: 'min-w-[150px]' },
-    { key: 'supplier_name', label: 'ПОСТАВЩИК', width: 'min-w-[220px]' },
-    ...esfYears.map((year) => ({
-      key: `year_${year}`,
-      label: String(year),
-      width: 'w-[120px]',
-    })),
-    { key: 'overall_total', label: 'ОБЩИЙ ИТОГ', width: 'w-[150px]' },
-  ]
-}
-
-function buildEsfTruColumns(esfYears = []) {
-  return [
-    { key: 'buyer_iin_bin', label: 'ИИН/БИН ПОКУП.', width: 'min-w-[150px]' },
-    { key: 'buyer_name', label: 'ПОКУПАТЕЛЬ', width: 'min-w-[220px]' },
-    { key: 'supplier_iin_bin', label: 'ИИН/БИН ПОСТ.', width: 'min-w-[150px]' },
-    { key: 'supplier_name', label: 'ПОСТАВЩИК', width: 'min-w-[220px]' },
-    { key: 'tru_name', label: 'НАИМЕНОВАНИЕ ТРУ', width: 'min-w-[260px]' },
-    { key: 'price_with_vat', label: 'ЦЕНА С НДС', width: 'w-[130px]' },
-    { key: 'price_without_vat', label: 'ЦЕНА БЕЗ НДС', width: 'w-[130px]' },
-    { key: 'vat_rate', label: 'СТАВКА НДС', width: 'w-[110px]' },
-    { key: 'unit', label: 'ЕД. ИЗМ.', width: 'w-[120px]' },
-    { key: 'currency', label: 'КОД ВАЛ.', width: 'w-[100px]' },
-    ...esfYears.map((year) => ({
-      key: `qty_${year}`,
-      label: `КОЛ-ВО ${year}`,
-      width: 'w-[120px]',
-    })),
-    ...esfYears.map((year) => ({
-      key: `amt_${year}`,
-      label: `ОБЩАЯ СУММА ${year}`,
-      width: 'w-[150px]',
-    })),
-    { key: 'total_quantity', label: 'ИТОГ КОЛ-ВО', width: 'w-[140px]' },
-    { key: 'total_amount', label: 'ОБЩАЯ СУММА', width: 'w-[150px]' },
-  ]
-}
 
 function isEsfNumericColumn(key) {
   return /^(price_|qty_|amt_|year_|overall_total|total_|vat_rate)/.test(key)
@@ -283,15 +177,8 @@ function DataTable({
   pagination = {},
   summary = {},
   recordsMode = 'bank',
-  esfDirection = 'sale',
-  esfSheet = 'esf',
-  esfYears = [],
   loading = false,
-  exportLoading = false,
-  onExport,
   onRecordsModeChange,
-  onEsfDirectionChange,
-  onEsfSheetChange,
   sortConfig = { key: 'date', direction: 'desc' },
   onSortChange,
   onPageChange,
@@ -302,18 +189,14 @@ function DataTable({
   const { page = 1, total = 0, total_pages = 0 } = pagination
   const activeColumns = useMemo(() => {
     if (recordsMode !== 'esf') return isAdmin ? [...bankColumns, adminColumn] : bankColumns
-    if (esfSheet === 'summary') return buildEsfSummaryColumns(esfYears)
-    if (esfSheet === 'tru') return buildEsfTruColumns(esfYears)
     return esfRawColumns
-  }, [recordsMode, isAdmin, esfSheet, esfYears])
+  }, [recordsMode, isAdmin])
 
   const modeLabel = useMemo(() => {
     if (recordsMode === 'all') return 'Совместные транзакции'
     if (recordsMode === 'bank') return 'Банковские транзакции'
-    if (esfSheet === 'summary') return esfDirection === 'purchase' ? 'Свод 8' : 'Свод 7'
-    if (esfSheet === 'tru') return 'Свод ТРУ'
     return 'ЭСФ'
-  }, [recordsMode, esfDirection, esfSheet])
+  }, [recordsMode])
 
   const scrollToTop = () => {
     containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
@@ -364,16 +247,6 @@ function DataTable({
                 </div>
                 <ModeSwitch recordsMode={recordsMode} onRecordsModeChange={onRecordsModeChange} />
               </div>
-              <div className="flex flex-col gap-3">
-                {recordsMode === 'esf' && (
-                  <EsfSwitches
-                    esfDirection={esfDirection}
-                    esfSheet={esfSheet}
-                    onEsfDirectionChange={onEsfDirectionChange}
-                    onEsfSheetChange={onEsfSheetChange}
-                  />
-                )}
-              </div>
             </div>
           </div>
 
@@ -389,16 +262,6 @@ function DataTable({
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
-
-            <button
-              type="button"
-              onClick={onExport}
-              disabled={exportLoading}
-              className="p-2.5 aspect-square bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-slate-600 dark:text-zinc-400 hover:text-emerald-500 hover:border-emerald-500/30 transition-all disabled:opacity-50"
-              title="Экспорт"
-            >
-              {exportLoading ? <span className="w-3.5 h-3.5 border-2 border-emerald-500 border-t-transparent animate-spin rounded-full" /> : <Download className="w-3.5 h-3.5" />}
-            </button>
 
             <button
               type="button"
